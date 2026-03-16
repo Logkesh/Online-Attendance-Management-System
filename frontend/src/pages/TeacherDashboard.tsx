@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { apiFetch } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import type { Course, SessionResponse } from '../types';
-import { Card } from '../components/Card';
+import { MobileShell } from '../components/MobileShell';
 
 export const TeacherDashboard = () => {
   const { token, user, logout } = useAuth();
@@ -13,7 +13,7 @@ export const TeacherDashboard = () => {
   const [sessionTitle, setSessionTitle] = useState('Today Lecture');
   const [lat, setLat] = useState('');
   const [lon, setLon] = useState('');
-  const [radius, setRadius] = useState('50');
+  const [radius, setRadius] = useState('40');
   const [createdSession, setCreatedSession] = useState<SessionResponse | null>(null);
   const [message, setMessage] = useState('');
 
@@ -33,7 +33,7 @@ export const TeacherDashboard = () => {
       await apiFetch('/courses', { method: 'POST', body: JSON.stringify({ name, code }) }, token);
       setName('');
       setCode('');
-      setMessage('Course created');
+      setMessage('Course created successfully.');
       await loadCourses();
     } catch (error) {
       setMessage((error as Error).message);
@@ -58,52 +58,53 @@ export const TeacherDashboard = () => {
         token
       );
       setCreatedSession(data.session);
-      setMessage('Session and QR created');
+      setMessage('Session created. Share QR now.');
     } catch (error) {
       setMessage((error as Error).message);
     }
   };
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md space-y-4 p-4">
-      <header className="rounded-2xl bg-white p-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold">Welcome, {user?.name}</h1>
-            <p className="text-sm text-slate-500">Teacher Dashboard</p>
-          </div>
-          <button className="text-sm text-red-600" onClick={logout}>Logout</button>
-        </div>
-      </header>
+    <MobileShell title={`Hi ${user?.name ?? 'Teacher'}`} subtitle="Create classes and launch live QR attendance.">
+      <div className="mb-3 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-3 text-xs text-indigo-700">
+        Courses: <span className="font-bold">{courses.length}</span>
+        <button className="float-right font-semibold text-rose-600" onClick={logout}>Logout</button>
+      </div>
 
-      <Card title="Create Course">
-        <input className="mb-2 w-full rounded-xl border p-2" placeholder="Course Name" value={name} onChange={(e) => setName(e.target.value)} />
-        <input className="mb-2 w-full rounded-xl border p-2" placeholder="Course Code" value={code} onChange={(e) => setCode(e.target.value)} />
-        <button className="w-full rounded-xl bg-blue-600 py-2 text-white" onClick={createCourse}>Create</button>
-      </Card>
+      <section className="mb-4 space-y-2 rounded-2xl border border-slate-200 p-3">
+        <h2 className="text-sm font-semibold">Create Course</h2>
+        <input className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Course name" value={name} onChange={(event) => setName(event.target.value)} />
+        <input className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Course code" value={code} onChange={(event) => setCode(event.target.value)} />
+        <button className="w-full rounded-xl bg-slate-900 py-2 text-sm font-semibold text-white" onClick={createCourse}>Save Course</button>
+      </section>
 
-      <Card title="Start Attendance Session">
-        <select className="mb-2 w-full rounded-xl border p-2" value={selectedCourseId} onChange={(e) => setSelectedCourseId(Number(e.target.value))}>
-          <option value="">Select Course</option>
-          {courses.map((c) => (
-            <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+      <section className="space-y-2 rounded-2xl border border-slate-200 p-3">
+        <h2 className="text-sm font-semibold">Create Attendance Session</h2>
+        <select className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" value={selectedCourseId} onChange={(event) => setSelectedCourseId(Number(event.target.value))}>
+          <option value="">Select course</option>
+          {courses.map((course) => (
+            <option key={course.id} value={course.id}>{course.name} ({course.code})</option>
           ))}
         </select>
-        <input className="mb-2 w-full rounded-xl border p-2" value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} placeholder="Session title" />
-        <input className="mb-2 w-full rounded-xl border p-2" value={lat} onChange={(e) => setLat(e.target.value)} placeholder="Latitude" />
-        <input className="mb-2 w-full rounded-xl border p-2" value={lon} onChange={(e) => setLon(e.target.value)} placeholder="Longitude" />
-        <input className="mb-2 w-full rounded-xl border p-2" value={radius} onChange={(e) => setRadius(e.target.value)} placeholder="Radius in meters" />
-        <button className="w-full rounded-xl bg-emerald-600 py-2 text-white" onClick={createSession}>Create QR Session</button>
-      </Card>
+        <input className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" value={sessionTitle} onChange={(event) => setSessionTitle(event.target.value)} placeholder="Session title" />
+        <div className="grid grid-cols-2 gap-2">
+          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={lat} onChange={(event) => setLat(event.target.value)} placeholder="Latitude" />
+          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={lon} onChange={(event) => setLon(event.target.value)} placeholder="Longitude" />
+        </div>
+        <input className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" value={radius} onChange={(event) => setRadius(event.target.value)} placeholder="Radius (m)" />
+        <button className="w-full rounded-xl bg-indigo-600 py-2 text-sm font-semibold text-white" onClick={createSession}>Generate QR Session</button>
+      </section>
 
       {createdSession && (
-        <Card title="Live QR Code">
-          <img src={createdSession.qrDataUrl} alt="Attendance QR" className="mx-auto w-52" />
-          <p className="mt-2 text-center text-sm text-slate-600">Valid until {new Date(createdSession.expiresAt).toLocaleString()}</p>
-        </Card>
+        <section className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-center">
+          <p className="text-xs font-semibold text-emerald-700">Active QR</p>
+          <img src={createdSession.qrDataUrl} alt="QR code" className="mx-auto mt-2 w-44 rounded-xl bg-white p-2" />
+          <p className="mt-2 text-xs text-slate-600">Valid till {new Date(createdSession.expiresAt).toLocaleString()}</p>
+          <p className="mt-1 break-all text-[11px] text-slate-500">Token: {createdSession.qrToken}</p>
+        </section>
       )}
 
-      {message && <p className="text-center text-sm text-slate-700">{message}</p>}
-    </main>
+      {message && <p className="mt-3 text-center text-xs text-slate-600">{message}</p>}
+    </MobileShell>
   );
 };

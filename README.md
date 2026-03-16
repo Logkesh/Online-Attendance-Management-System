@@ -1,6 +1,6 @@
 # QR Code + Location-Based Attendance Management System
 
-Full-stack attendance platform inspired by the provided QR attendance GitHub project and implemented with a mobile-first UI approach aligned to the provided Figma wireframe.
+Full-stack attendance platform inspired by the provided QR attendance GitHub project and rebuilt with a mobile-first frontend matching the provided Figma login/dashboard style.
 
 ## Tech Stack
 
@@ -98,7 +98,7 @@ cd frontend
 npm run dev
 ```
 
-Frontend runs at `http://localhost:5173` and calls backend at `http://localhost:4000/api`.
+Frontend runs at `http://localhost:5173` and calls backend at `http://localhost:4000/api` (login route: `/login`).
 
 To override API URL in frontend, set `VITE_API_URL`.
 

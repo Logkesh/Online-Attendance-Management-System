@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { apiFetch } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import type { Course } from '../types';
-import { Card } from '../components/Card';
+import { MobileShell } from '../components/MobileShell';
 
 export const StudentDashboard = () => {
   const { token, user, logout } = useAuth();
@@ -45,48 +45,48 @@ export const StudentDashboard = () => {
         },
         token
       );
-      setMessage(data.distanceMeters ? `${data.message} (${data.distanceMeters} m)` : data.message);
+      setMessage(data.distanceMeters ? `${data.message} (${data.distanceMeters}m)` : data.message);
     } catch (error) {
       setMessage((error as Error).message);
     }
   };
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md space-y-4 p-4">
-      <header className="rounded-2xl bg-white p-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold">Hello, {user?.name}</h1>
-            <p className="text-sm text-slate-500">Student Dashboard</p>
-          </div>
-          <button className="text-sm text-red-600" onClick={logout}>Logout</button>
+    <MobileShell title={`Hello ${user?.name ?? 'Student'}`} subtitle="Enroll and mark attendance with QR + location.">
+      <div className="mb-3 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-3 text-xs text-indigo-700">
+        Enrolled Courses: <span className="font-bold">{courses.length}</span>
+        <button className="float-right font-semibold text-rose-600" onClick={logout}>Logout</button>
+      </div>
+
+      <section className="mb-4 space-y-2 rounded-2xl border border-slate-200 p-3">
+        <h2 className="text-sm font-semibold">Join a Course</h2>
+        <input className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Course ID" value={enrollCourseId} onChange={(event) => setEnrollCourseId(event.target.value)} />
+        <button className="w-full rounded-xl bg-slate-900 py-2 text-sm font-semibold text-white" onClick={enroll}>Enroll</button>
+      </section>
+
+      <section className="space-y-2 rounded-2xl border border-slate-200 p-3">
+        <h2 className="text-sm font-semibold">Mark Attendance</h2>
+        <input className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="QR token from scanner" value={qrToken} onChange={(event) => setQrToken(event.target.value)} />
+        <div className="grid grid-cols-2 gap-2">
+          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Latitude" value={lat} onChange={(event) => setLat(event.target.value)} />
+          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Longitude" value={lon} onChange={(event) => setLon(event.target.value)} />
         </div>
-      </header>
+        <button className="w-full rounded-xl bg-indigo-600 py-2 text-sm font-semibold text-white" onClick={markAttendance}>Submit Attendance</button>
+      </section>
 
-      <Card title="Enroll by Course ID">
-        <input className="mb-2 w-full rounded-xl border p-2" value={enrollCourseId} onChange={(e) => setEnrollCourseId(e.target.value)} placeholder="Course ID" />
-        <button className="w-full rounded-xl bg-blue-600 py-2 text-white" onClick={enroll}>Enroll</button>
-      </Card>
-
-      <Card title="Mark Attendance">
-        <input className="mb-2 w-full rounded-xl border p-2" value={qrToken} onChange={(e) => setQrToken(e.target.value)} placeholder="QR Token" />
-        <input className="mb-2 w-full rounded-xl border p-2" value={lat} onChange={(e) => setLat(e.target.value)} placeholder="Your latitude" />
-        <input className="mb-2 w-full rounded-xl border p-2" value={lon} onChange={(e) => setLon(e.target.value)} placeholder="Your longitude" />
-        <button className="w-full rounded-xl bg-emerald-600 py-2 text-white" onClick={markAttendance}>Submit Attendance</button>
-      </Card>
-
-      <Card title="My Courses">
-        <ul className="space-y-2 text-sm">
-          {courses.map((c) => (
-            <li key={c.id} className="rounded-lg bg-slate-100 p-2">
-              {c.name} - {c.code} (ID: {c.id})
+      <section className="mt-4 rounded-2xl border border-slate-200 p-3">
+        <h2 className="mb-2 text-sm font-semibold">My Courses</h2>
+        <ul className="space-y-2 text-xs">
+          {courses.length === 0 && <li className="text-slate-400">No courses yet.</li>}
+          {courses.map((course) => (
+            <li key={course.id} className="rounded-xl bg-slate-100 px-3 py-2">
+              {course.name} · {course.code} · ID {course.id}
             </li>
           ))}
-          {courses.length === 0 && <li className="text-slate-500">No enrolled courses.</li>}
         </ul>
-      </Card>
+      </section>
 
-      {message && <p className="text-center text-sm text-slate-700">{message}</p>}
-    </main>
+      {message && <p className="mt-3 text-center text-xs text-slate-600">{message}</p>}
+    </MobileShell>
   );
 };

@@ -1,66 +1,97 @@
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import type { Role } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { Input } from '../components/Input';
+import type { Role } from '../types';
+import { MobileShell } from '../components/MobileShell';
 
 export const AuthPage = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isRegister = location.pathname === '/register';
   const { login, register } = useAuth();
-  const [isRegister, setIsRegister] = useState(false);
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>('student');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
+    setLoading(true);
     try {
       if (isRegister) {
         await register(name, email, password, role);
       } else {
         await login(email, password);
       }
-    } catch (err) {
-      setError((err as Error).message);
+      navigate('/');
+    } catch (submissionError) {
+      setError((submissionError as Error).message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md items-center p-4">
-      <div className="w-full rounded-3xl bg-white p-6 shadow-md">
-        <h1 className="text-2xl font-bold text-slate-900">QR Attendance</h1>
-        <p className="mb-5 mt-1 text-sm text-slate-500">Login or create an account</p>
-        <form onSubmit={submit}>
-          {isRegister && <Input label="Full Name" value={name} onChange={(e) => setName(e.target.value)} required />}
-          <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <Input
-            label="Password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+    <MobileShell
+      title={isRegister ? 'Create your account' : 'Welcome back'}
+      subtitle={isRegister ? 'Join as teacher or student to get started.' : 'Login to continue attendance workflow.'}
+    >
+      <div className="mb-5 grid grid-cols-2 rounded-2xl bg-slate-100 p-1 text-sm font-semibold">
+        <Link to="/login" className={`rounded-xl px-3 py-2 text-center ${!isRegister ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
+          Login
+        </Link>
+        <Link to="/register" className={`rounded-xl px-3 py-2 text-center ${isRegister ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>
+          Register
+        </Link>
+      </div>
+
+      <form onSubmit={submit} className="space-y-3">
+        {isRegister && (
+          <input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-indigo-400"
+            placeholder="Full name"
             required
           />
-          {isRegister && (
-            <label className="mb-4 block text-sm text-slate-700">
-              <span className="mb-1 block">Role</span>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as Role)}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2"
-              >
-                <option value="student">Student</option>
-                <option value="teacher">Teacher</option>
-              </select>
-            </label>
-          )}
-          {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
-          <button className="w-full rounded-xl bg-blue-600 py-2 text-white">{isRegister ? 'Register' : 'Login'}</button>
-        </form>
-        <button className="mt-4 text-sm text-blue-600" onClick={() => setIsRegister((v) => !v)}>
-          {isRegister ? 'Already have an account? Login' : 'New here? Register'}
+        )}
+        <input
+          value={email}
+          type="email"
+          onChange={(event) => setEmail(event.target.value)}
+          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-indigo-400"
+          placeholder="Email address"
+          required
+        />
+        <input
+          value={password}
+          type="password"
+          onChange={(event) => setPassword(event.target.value)}
+          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-indigo-400"
+          placeholder="Password"
+          required
+        />
+        {isRegister && (
+          <select
+            value={role}
+            onChange={(event) => setRole(event.target.value as Role)}
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-indigo-400"
+          >
+            <option value="student">Student</option>
+            <option value="teacher">Teacher</option>
+          </select>
+        )}
+
+        {error && <p className="text-sm text-rose-600">{error}</p>}
+
+        <button disabled={loading} className="w-full rounded-2xl bg-indigo-600 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60">
+          {loading ? 'Please wait...' : isRegister ? 'Create Account' : 'Sign In'}
         </button>
-      </div>
-    </main>
+      </form>
+    </MobileShell>
   );
 };

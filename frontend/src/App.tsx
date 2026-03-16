@@ -1,20 +1,28 @@
+import { Navigate, Route, Routes } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
 import { AuthPage } from './pages/AuthPage';
 import { TeacherDashboard } from './pages/TeacherDashboard';
 import { StudentDashboard } from './pages/StudentDashboard';
-import { useAuth } from './context/AuthContext';
 
 const App = () => {
   const { user } = useAuth();
 
   if (!user) {
-    return <AuthPage />;
+    return (
+      <Routes>
+        <Route path="/login" element={<AuthPage />} />
+        <Route path="/register" element={<AuthPage />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
   }
 
-  if (user.role === 'teacher') {
-    return <TeacherDashboard />;
-  }
-
-  return <StudentDashboard />;
+  return (
+    <Routes>
+      <Route path="/" element={user.role === 'teacher' ? <TeacherDashboard /> : <StudentDashboard />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
 };
 
 export default App;
