@@ -25,8 +25,24 @@ const get = (query, params = []) =>
     });
   });
 
+const all = (query, params = []) =>
+  new Promise((resolve, reject) => {
+    db.all(query, params, (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+
+const ensureColumn = async (tableName, columnName, definition) => {
+  const columns = await all(`PRAGMA table_info(${tableName})`);
+  const exists = columns.some((col) => col.name === columnName);
+  if (!exists) {
+    await run(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+  }
+};
+
 export const initializeDatabase = async () => {
-  await run(`PRAGMA foreign_keys = ON`);
+  await run('PRAGMA foreign_keys = ON');
 
   await run(`CREATE TABLE IF NOT EXISTS FACULTY (
     faculty_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,16 +84,25 @@ export const initializeDatabase = async () => {
   await run(`CREATE TABLE IF NOT EXISTS CLASS_SESSION (
     session_id TEXT PRIMARY KEY,
     qrcode TEXT NOT NULL,
+    qr_image TEXT,
     subject_id INTEGER,
     class_id INTEGER,
     faculty_id INTEGER,
     starttime TEXT NOT NULL,
     endtime TEXT NOT NULL,
     date TEXT NOT NULL,
+    faculty_lat REAL,
+    faculty_lng REAL,
+    allowed_radius_m INTEGER DEFAULT 100,
     FOREIGN KEY (subject_id) REFERENCES SUBJECT (sub_id),
     FOREIGN KEY (class_id) REFERENCES CLASS (class_id),
     FOREIGN KEY (faculty_id) REFERENCES FACULTY (faculty_id)
   )`);
+
+  await ensureColumn('CLASS_SESSION', 'qr_image', 'TEXT');
+  await ensureColumn('CLASS_SESSION', 'faculty_lat', 'REAL');
+  await ensureColumn('CLASS_SESSION', 'faculty_lng', 'REAL');
+  await ensureColumn('CLASS_SESSION', 'allowed_radius_m', 'INTEGER DEFAULT 100');
 
   await run(`CREATE TABLE IF NOT EXISTS ATTENDANCE (
     session_id TEXT,
@@ -123,16 +148,6 @@ const seedData = async () => {
   ]);
 };
 
-export const dbAsync = {
-  run,
-  get,
-  all: (query, params = []) =>
-    new Promise((resolve, reject) => {
-      db.all(query, params, (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows);
-      });
-    })
-};
+export const dbAsync = { run, get, all };
 
 export default db;

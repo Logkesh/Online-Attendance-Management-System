@@ -1,4 +1,4 @@
-import { FormEvent, ReactElement, useEffect, useMemo, useState } from 'react';
+import { FormEvent, ReactElement, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { apiRequest } from './services/api';
@@ -8,15 +8,30 @@ type Role = 'faculty' | 'student';
 type SessionResponse = {
   session_id: string;
   qrcode: string;
+  qr_image: string;
   class_id: number;
   subject_id: number;
   faculty_id: number;
   starttime: string;
   endtime: string;
   date: string;
+  allowed_radius_m: number;
 };
 
 type Student = { student_id: number; stud_name: string; stud_username: string };
+
+type ScanState = { success: boolean; message: string };
+
+declare global {
+  interface Window {
+    BarcodeDetector?: {
+      new (options: { formats: string[] }): {
+        detect(source: CanvasImageSource): Promise<Array<{ rawValue?: string }>>;
+      };
+      getSupportedFormats?: () => Promise<string[]>;
+    };
+  }
+}
 
 const MobileScreen = ({ title, children }: { title: string; children: React.ReactNode }) => {
   const location = useLocation();
@@ -35,13 +50,7 @@ const MobileScreen = ({ title, children }: { title: string; children: React.Reac
 };
 
 const ActionButton = ({ text, onClick, variant = 'default' }: { text: string; onClick: () => void; variant?: 'default' | 'danger' | 'muted' }) => {
-  const style =
-    variant === 'danger'
-      ? 'bg-rose-600 text-white'
-      : variant === 'muted'
-      ? 'bg-slate-200 text-slate-800'
-      : 'bg-slate-800 text-white';
-
+  const style = variant === 'danger' ? 'bg-rose-600 text-white' : variant === 'muted' ? 'bg-slate-200 text-slate-800' : 'bg-slate-800 text-white';
   return (
     <button className={`w-full rounded-lg px-4 py-2 text-sm font-medium ${style}`} onClick={onClick}>
       {text}
@@ -49,9 +58,21 @@ const ActionButton = ({ text, onClick, variant = 'default' }: { text: string; on
   );
 };
 
-const ScreenCard = ({ children }: { children: React.ReactNode }) => (
-  <div className="rounded-xl border border-slate-200 bg-white p-3">{children}</div>
-);
+const ScreenCard = ({ children }: { children: React.ReactNode }) => <div className="rounded-xl border border-slate-200 bg-white p-3">{children}</div>;
+
+const getCurrentLocation = async () =>
+  new Promise<{ lat: number; lng: number }>((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocation is not supported on this device'));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
+      () => reject(new Error('Location access is required')),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  });
 
 const SplashScreen = () => {
   const navigate = useNavigate();
@@ -107,9 +128,7 @@ const LoginScreen = () => {
         <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Email / ID" value={username} onChange={(e) => setUsername(e.target.value)} />
         <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
         {error && <p className="text-xs text-rose-600">{error}</p>}
-        <button className="w-full rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white" type="submit">
-          Login
-        </button>
+        <button className="w-full rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white" type="submit">Login</button>
       </form>
       <p className="text-[11px] text-slate-500">Demo: faculty1/faculty123 and student1/student123</p>
     </MobileScreen>
@@ -124,7 +143,6 @@ const FacultyHomeScreen = () => {
     <MobileScreen title="Faculty Home Screen">
       <p className="text-sm text-slate-700">Welcome, {name}</p>
       <ActionButton text="Start Attendance Session" onClick={() => navigate('/faculty/start')} />
-      <ActionButton text="Manual Attendance" onClick={() => navigate('/faculty/manual')} />
       <ActionButton text="View Attendance Dashboard" onClick={() => navigate('/faculty/dashboard')} />
       <ActionButton text="Logout" variant="danger" onClick={() => { logout(); navigate('/login'); }} />
     </MobileScreen>
@@ -153,21 +171,33 @@ const StartAttendanceScreen = () => {
   const [starttime, setStarttime] = useState('09:00:00');
   const [endtime, setEndtime] = useState('09:10:00');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [radius, setRadius] = useState(100);
   const [message, setMessage] = useState('');
 
   const startSession = async () => {
     try {
+      setMessage('Capturing faculty location...');
+      const location = await getCurrentLocation();
       const data = (await apiRequest(
         '/session/create',
         {
           method: 'POST',
-          body: JSON.stringify({ subject_id: subjectId, class_id: classId, faculty_id: userId, starttime, endtime, date })
+          body: JSON.stringify({
+            subject_id: subjectId,
+            class_id: classId,
+            faculty_id: userId,
+            starttime,
+            endtime,
+            date,
+            faculty_lat: location.lat,
+            faculty_lng: location.lng,
+            allowed_radius_m: radius
+          })
         },
         token
       )) as SessionResponse;
 
       localStorage.setItem('active-session', JSON.stringify(data));
-      setMessage(`Session started (${data.session_id.slice(0, 8)}...)`);
       navigate('/faculty/qr');
     } catch (err) {
       setMessage((err as Error).message);
@@ -193,45 +223,36 @@ const StartAttendanceScreen = () => {
         <input className="rounded-lg border border-slate-300 px-2 py-2 text-xs" type="time" value={endtime.slice(0, 5)} onChange={(e) => setEndtime(`${e.target.value}:00`)} />
       </div>
       <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+      <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" type="number" min={10} value={radius} onChange={(e) => setRadius(Number(e.target.value))} placeholder="Allowed radius (meters)" />
       <ActionButton text="Start Session" onClick={startSession} />
       {message && <p className="text-xs text-slate-600">{message}</p>}
     </MobileScreen>
   );
 };
 
-const qrs = (value: string) => {
-  const size = 17;
-  const chars = value.split('').map((ch) => ch.charCodeAt(0));
-  return Array.from({ length: size * size }, (_, i) => {
-    const code = chars[i % Math.max(chars.length, 1)] || 0;
-    return (code + i * 13) % 2 === 0;
-  });
-};
-
 const QRCodeDisplayScreen = () => {
-  const [session, setSession] = useState<SessionResponse | null>(null);
   const navigate = useNavigate();
+  const [session, setSession] = useState<SessionResponse | null>(null);
 
   useEffect(() => {
     const raw = localStorage.getItem('active-session');
     if (raw) setSession(JSON.parse(raw));
   }, []);
 
-  const secondsLeft = useMemo(() => {
-    if (!session) return 0;
-    const end = new Date(`${session.date}T${session.endtime}`).getTime();
-    const now = Date.now();
-    return Math.max(0, Math.floor((end - now) / 1000));
-  }, [session]);
+  const [liveSeconds, setLiveSeconds] = useState(0);
 
-  const [liveSeconds, setLiveSeconds] = useState(secondsLeft);
   useEffect(() => {
-    setLiveSeconds(secondsLeft);
-  }, [secondsLeft]);
-  useEffect(() => {
-    const id = setInterval(() => setLiveSeconds((prev) => Math.max(0, prev - 1)), 1000);
-    return () => clearInterval(id);
-  }, []);
+    if (!session) return;
+    const refresh = () => {
+      const end = new Date(`${session.date}T${session.endtime}`).getTime();
+      const now = Date.now();
+      setLiveSeconds(Math.max(0, Math.floor((end - now) / 1000)));
+    };
+
+    refresh();
+    const interval = setInterval(refresh, 1000);
+    return () => clearInterval(interval);
+  }, [session]);
 
   if (!session) {
     return (
@@ -242,21 +263,16 @@ const QRCodeDisplayScreen = () => {
     );
   }
 
-  const bits = qrs(session.session_id);
   const mins = `${Math.floor(liveSeconds / 60)}`.padStart(2, '0');
   const secs = `${liveSeconds % 60}`.padStart(2, '0');
 
   return (
     <MobileScreen title="QR Code Display Screen">
       <ScreenCard>
-        <div className="mx-auto grid w-60 grid-cols-[repeat(17,minmax(0,1fr))] gap-[2px] rounded-lg border border-slate-300 p-2">
-          {bits.map((filled, idx) => (
-            <span key={idx} className={`aspect-square rounded-[2px] ${filled ? 'bg-slate-800' : 'bg-slate-100'}`} />
-          ))}
-        </div>
+        <img src={session.qr_image} alt="Generated attendance QR" className="mx-auto h-64 w-64 border border-slate-300 p-2" />
       </ScreenCard>
       <p className="text-center text-sm font-medium text-slate-800">Time Left: {mins}:{secs}</p>
-      <p className="break-all rounded-lg bg-slate-100 p-2 text-[10px] text-slate-600">Session ID: {session.session_id}</p>
+      <ActionButton text="Manual Attendance" variant="muted" onClick={() => navigate('/faculty/manual')} />
       <ActionButton
         text="End Session"
         variant="danger"
@@ -271,15 +287,18 @@ const QRCodeDisplayScreen = () => {
 
 const ManualAttendanceScreen = () => {
   const { token } = useAuth();
-  const [sessionId, setSessionId] = useState('');
-  const [classId, setClassId] = useState(1);
   const [students, setStudents] = useState<Student[]>([]);
   const [selected, setSelected] = useState<Record<number, boolean>>({});
   const [status, setStatus] = useState('');
+  const session = useMemo(() => {
+    const raw = localStorage.getItem('active-session');
+    return raw ? (JSON.parse(raw) as SessionResponse) : null;
+  }, []);
 
   const loadStudents = async () => {
+    if (!session) return;
     try {
-      const list = await apiRequest(`/attendance/class/${classId}/students`, {}, token);
+      const list = await apiRequest(`/attendance/class/${session.class_id}/students`, {}, token);
       setStudents(list);
     } catch (err) {
       setStatus((err as Error).message);
@@ -291,8 +310,8 @@ const ManualAttendanceScreen = () => {
   }, []);
 
   const saveManualAttendance = async () => {
-    if (!sessionId) {
-      setStatus('Please enter a session ID.');
+    if (!session) {
+      setStatus('No active session found.');
       return;
     }
 
@@ -304,7 +323,7 @@ const ManualAttendanceScreen = () => {
 
     const results = await Promise.allSettled(
       selectedStudents.map((s) =>
-        apiRequest('/attendance/mark', { method: 'POST', body: JSON.stringify({ session_id: sessionId, student_id: s.student_id }) }, token)
+        apiRequest('/attendance/mark', { method: 'POST', body: JSON.stringify({ session_id: session.session_id, student_id: s.student_id }) }, token)
       )
     );
 
@@ -314,13 +333,7 @@ const ManualAttendanceScreen = () => {
 
   return (
     <MobileScreen title="Manual Attendance Screen">
-      <div className="grid grid-cols-2 gap-2">
-        <input className="rounded-lg border border-slate-300 px-2 py-2 text-xs" value={sessionId} placeholder="Session ID" onChange={(e) => setSessionId(e.target.value)} />
-        <select className="rounded-lg border border-slate-300 px-2 py-2 text-xs" value={classId} onChange={(e) => setClassId(Number(e.target.value))}>
-          <option value={1}>CSE-A</option>
-        </select>
-      </div>
-      <ActionButton text="Load Students" variant="muted" onClick={loadStudents} />
+      {session && <p className="rounded-lg bg-slate-100 p-2 text-[11px]">Session: {session.session_id.slice(0, 10)}...</p>}
       <div className="max-h-72 space-y-2 overflow-auto rounded-lg border border-slate-200 p-2">
         {students.map((student) => (
           <label key={student.student_id} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm">
@@ -328,12 +341,7 @@ const ManualAttendanceScreen = () => {
             <input
               type="checkbox"
               checked={Boolean(selected[student.student_id])}
-              onChange={(e) =>
-                setSelected((prev) => ({
-                  ...prev,
-                  [student.student_id]: e.target.checked
-                }))
-              }
+              onChange={(e) => setSelected((prev) => ({ ...prev, [student.student_id]: e.target.checked }))}
             />
           </label>
         ))}
@@ -362,14 +370,8 @@ const FacultyDashboardScreen = () => {
   return (
     <MobileScreen title="Faculty Dashboard">
       <div className="grid grid-cols-2 gap-2">
-        <ScreenCard>
-          <p className="text-xs text-slate-500">Total Classes</p>
-          <p className="text-xl font-bold text-slate-800">{cards.totalClasses}</p>
-        </ScreenCard>
-        <ScreenCard>
-          <p className="text-xs text-slate-500">Present Count</p>
-          <p className="text-xl font-bold text-slate-800">{cards.presentCount}</p>
-        </ScreenCard>
+        <ScreenCard><p className="text-xs text-slate-500">Total Classes</p><p className="text-xl font-bold text-slate-800">{cards.totalClasses}</p></ScreenCard>
+        <ScreenCard><p className="text-xs text-slate-500">Present Count</p><p className="text-xl font-bold text-slate-800">{cards.presentCount}</p></ScreenCard>
       </div>
       <ScreenCard>
         <p className="mb-2 text-xs font-semibold text-slate-700">Subject-wise Attendance Summary</p>
@@ -389,54 +391,96 @@ const FacultyDashboardScreen = () => {
 const QRScanScreen = () => {
   const navigate = useNavigate();
   const { token, userId } = useAuth();
-  const [sessionId, setSessionId] = useState('');
-  const [message, setMessage] = useState('');
-  const [success, setSuccess] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [message, setMessage] = useState('Initializing camera...');
+  const [scanning, setScanning] = useState(true);
 
-  const scanAndSubmit = async () => {
-    try {
-      await apiRequest('/session/validate', { method: 'POST', body: JSON.stringify({ session_id: sessionId }) }, token);
-      await apiRequest('/attendance/mark', { method: 'POST', body: JSON.stringify({ session_id: sessionId, student_id: userId }) }, token);
-      setSuccess(true);
-      setMessage('Present marked successfully.');
-      navigate('/student/status', { state: { success: true, message: 'Present marked successfully.' } });
-    } catch (err) {
-      setSuccess(false);
-      const errorMessage = (err as Error).message || 'Invalid QR';
-      setMessage(errorMessage);
-      navigate('/student/status', { state: { success: false, message: errorMessage } });
-    }
-  };
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+    let frameHandle: number | null = null;
+    let detector: { detect: (source: CanvasImageSource) => Promise<Array<{ rawValue?: string }>> } | null = null;
+
+    const scanFrame = async () => {
+      if (!videoRef.current || !detector || !scanning) {
+        frameHandle = requestAnimationFrame(scanFrame);
+        return;
+      }
+
+      try {
+        const result = await detector.detect(videoRef.current);
+        if (result.length > 0 && result[0].rawValue) {
+          setScanning(false);
+          const payload = JSON.parse(result[0].rawValue);
+          const location = await getCurrentLocation();
+          await apiRequest('/attendance/mark', {
+            method: 'POST',
+            body: JSON.stringify({ session_id: payload.session_id, student_id: userId, student_lat: location.lat, student_lng: location.lng })
+          }, token);
+          navigate('/student/status', { state: { success: true, message: 'Present marked successfully.' } satisfies ScanState });
+          return;
+        }
+      } catch {
+        // keep scanning
+      }
+
+      frameHandle = requestAnimationFrame(scanFrame);
+    };
+
+    const start = async () => {
+      try {
+        if (!window.BarcodeDetector) throw new Error('QR scanner not supported on this device/browser.');
+        detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+        setMessage('Point camera at attendance QR');
+        frameHandle = requestAnimationFrame(scanFrame);
+      } catch (err) {
+        setMessage((err as Error).message || 'Unable to access camera');
+      }
+    };
+
+    start();
+
+    return () => {
+      if (frameHandle != null) cancelAnimationFrame(frameHandle);
+      if (stream) stream.getTracks().forEach((track) => track.stop());
+    };
+  }, [navigate, scanning, token, userId]);
 
   return (
     <MobileScreen title="QR Scan Screen">
-      <div className="rounded-xl border border-dashed border-slate-400 bg-slate-50 p-4">
-        <div className="mx-auto grid h-48 w-48 place-items-center border-4 border-slate-400">
-          <div className="h-24 w-24 border-2 border-slate-500" />
+      <div className="relative overflow-hidden rounded-xl border border-dashed border-slate-400 bg-black">
+        <video ref={videoRef} className="h-64 w-full object-cover" muted playsInline />
+        <div className="pointer-events-none absolute inset-0 grid place-items-center">
+          <div className="h-36 w-36 border-4 border-white/90" />
         </div>
-        <p className="mt-2 text-center text-xs text-slate-600">Align QR code inside scan frame</p>
       </div>
-      <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Enter scanned Session ID" value={sessionId} onChange={(e) => setSessionId(e.target.value)} />
-      <ActionButton text="Scan & Mark Attendance" onClick={scanAndSubmit} />
-      {message && <p className={`text-xs ${success ? 'text-emerald-700' : 'text-rose-700'}`}>{message}</p>}
+      <p className="text-center text-xs text-slate-600">{message}</p>
+      <ActionButton
+        text="Mark Failure / Retry"
+        variant="muted"
+        onClick={() => navigate('/student/status', { state: { success: false, message: 'Outside location / Invalid QR / Scan failed' } satisfies ScanState })}
+      />
     </MobileScreen>
   );
 };
 
 const AttendanceStatusScreen = () => {
   const location = useLocation();
-  const state = location.state as { success?: boolean; message?: string } | null;
+  const navigate = useNavigate();
+  const state = location.state as ScanState | null;
   const success = Boolean(state?.success);
 
   return (
     <MobileScreen title="Attendance Status Screen">
       <ScreenCard>
-        <p className={`text-center text-lg font-semibold ${success ? 'text-emerald-700' : 'text-rose-700'}`}>
-          {success ? 'Present Marked' : 'Attendance Failed'}
-        </p>
+        <p className={`text-center text-lg font-semibold ${success ? 'text-emerald-700' : 'text-rose-700'}`}>{success ? 'Present Marked' : 'Attendance Failed'}</p>
         <p className="mt-2 text-center text-sm text-slate-600">{state?.message || 'Scan QR and submit attendance.'}</p>
       </ScreenCard>
-      <ActionButton text="Back to Student Home" onClick={() => window.history.back()} />
+      <ActionButton text="Back to Student Home" onClick={() => navigate('/student/home')} />
     </MobileScreen>
   );
 };
@@ -461,9 +505,7 @@ const StudentDashboardScreen = () => {
       <ScreenCard>
         <p className="text-xs text-slate-500">Overall Attendance</p>
         <p className="text-xl font-bold text-slate-800">{summary.overallPercentage}%</p>
-        <p className="text-[11px] text-slate-500">
-          Present {summary.presentSessions} of {summary.totalSessions} sessions
-        </p>
+        <p className="text-[11px] text-slate-500">Present {summary.presentSessions} of {summary.totalSessions} sessions</p>
       </ScreenCard>
       <ScreenCard>
         <p className="mb-2 text-xs font-semibold text-slate-700">Subject-wise Attendance</p>
@@ -471,9 +513,7 @@ const StudentDashboardScreen = () => {
           {summary.subjects.map((item) => (
             <div key={item.subject_id} className="rounded-md border border-slate-200 p-2 text-xs">
               <p className="font-medium">{item.sub_name}</p>
-              <p>
-                {item.present_sessions}/{item.total_sessions} ({item.total_sessions ? Math.round((item.present_sessions / item.total_sessions) * 100) : 0}%)
-              </p>
+              <p>{item.present_sessions}/{item.total_sessions} ({item.total_sessions ? Math.round((item.present_sessions / item.total_sessions) * 100) : 0}%)</p>
             </div>
           ))}
         </div>
@@ -503,13 +543,11 @@ const AppRoutes = () => (
   <Routes>
     <Route path="/" element={<SplashScreen />} />
     <Route path="/login" element={<LoginScreen />} />
-
     <Route path="/faculty/home" element={<ProtectedRoute role="faculty" element={<FacultyHomeScreen />} />} />
     <Route path="/faculty/start" element={<ProtectedRoute role="faculty" element={<StartAttendanceScreen />} />} />
     <Route path="/faculty/qr" element={<ProtectedRoute role="faculty" element={<QRCodeDisplayScreen />} />} />
     <Route path="/faculty/manual" element={<ProtectedRoute role="faculty" element={<ManualAttendanceScreen />} />} />
     <Route path="/faculty/dashboard" element={<ProtectedRoute role="faculty" element={<FacultyDashboardScreen />} />} />
-
     <Route path="/student/home" element={<ProtectedRoute role="student" element={<StudentHomeScreen />} />} />
     <Route path="/student/scan" element={<ProtectedRoute role="student" element={<QRScanScreen />} />} />
     <Route path="/student/status" element={<ProtectedRoute role="student" element={<AttendanceStatusScreen />} />} />

@@ -7,11 +7,29 @@ const isActiveSession = (session) => {
   return now >= start && now <= end;
 };
 
+const toRad = (value) => (value * Math.PI) / 180;
+
+const getDistanceMeters = (lat1, lng1, lat2, lng2) => {
+  const earthRadius = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadius * c;
+};
+
 export const markAttendance = async (req, res) => {
-  const { session_id, student_id } = req.body;
+  const { session_id, student_id, student_lat, student_lng } = req.body;
 
   if (!session_id || !student_id) {
     return res.status(400).json({ message: 'session_id and student_id are required' });
+  }
+
+  const isFacultyManual = req.user?.role === 'faculty';
+  if (!isFacultyManual && (student_lat == null || student_lng == null)) {
+    return res.status(400).json({ message: 'Student location is required while scanning QR' });
   }
 
   const session = await dbAsync.get('SELECT * FROM CLASS_SESSION WHERE session_id = ?', [session_id]);
@@ -24,6 +42,13 @@ export const markAttendance = async (req, res) => {
 
   if (student.student_class_id !== session.class_id) {
     return res.status(400).json({ message: 'Student does not belong to this class' });
+  }
+
+  if (!isFacultyManual) {
+    const distance = getDistanceMeters(Number(student_lat), Number(student_lng), Number(session.faculty_lat), Number(session.faculty_lng));
+    if (distance > Number(session.allowed_radius_m || 100)) {
+      return res.status(400).json({ message: 'Outside allowed location range' });
+    }
   }
 
   const existing = await dbAsync.get(
@@ -46,12 +71,10 @@ export const markAttendance = async (req, res) => {
 
 export const studentsByClass = async (req, res) => {
   const { class_id } = req.params;
-
   const students = await dbAsync.all(
     'SELECT student_id, stud_name, stud_username FROM STUDENT WHERE student_class_id = ? ORDER BY stud_name',
     [class_id]
   );
-
   return res.json(students);
 };
 
@@ -72,10 +95,7 @@ export const studentAttendanceHistory = async (req, res) => {
     [student_id]
   );
 
-  const classTotalSessions = await dbAsync.get(
-    'SELECT COUNT(*) AS total FROM CLASS_SESSION WHERE class_id = ?',
-    [student.student_class_id]
-  );
+  const classTotalSessions = await dbAsync.get('SELECT COUNT(*) AS total FROM CLASS_SESSION WHERE class_id = ?', [student.student_class_id]);
 
   const subjectSummaryRows = await dbAsync.all(
     `SELECT s.sub_name, cs.subject_id,

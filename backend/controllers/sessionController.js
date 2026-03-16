@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import QRCode from 'qrcode';
 import { dbAsync } from '../config/db.js';
 
 const isActiveSession = (session) => {
@@ -9,19 +10,33 @@ const isActiveSession = (session) => {
 };
 
 export const createSession = async (req, res) => {
-  const { subject_id, class_id, faculty_id, starttime, endtime, date } = req.body;
+  const { subject_id, class_id, faculty_id, starttime, endtime, date, faculty_lat, faculty_lng, allowed_radius_m = 100 } = req.body;
 
   if (!subject_id || !class_id || !faculty_id || !starttime || !endtime || !date) {
     return res.status(400).json({ message: 'All session fields are required' });
   }
 
+  if (faculty_lat == null || faculty_lng == null) {
+    return res.status(400).json({ message: 'Faculty location is required to start session' });
+  }
+
   const session_id = crypto.randomUUID();
-  const qrcode = JSON.stringify({ session_id, class_id, subject_id, faculty_id, date });
+  const qrPayload = {
+    session_id,
+    class_id,
+    subject_id,
+    faculty_id,
+    date,
+    type: 'attendance-session'
+  };
+
+  const qrcode = JSON.stringify(qrPayload);
+  const qr_image = await QRCode.toDataURL(qrcode);
 
   await dbAsync.run(
-    `INSERT INTO CLASS_SESSION (session_id, qrcode, subject_id, class_id, faculty_id, starttime, endtime, date)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [session_id, qrcode, subject_id, class_id, faculty_id, starttime, endtime, date]
+    `INSERT INTO CLASS_SESSION (session_id, qrcode, qr_image, subject_id, class_id, faculty_id, starttime, endtime, date, faculty_lat, faculty_lng, allowed_radius_m)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [session_id, qrcode, qr_image, subject_id, class_id, faculty_id, starttime, endtime, date, faculty_lat, faculty_lng, allowed_radius_m]
   );
 
   await dbAsync.run(
@@ -29,7 +44,18 @@ export const createSession = async (req, res) => {
     [faculty_id, class_id, subject_id]
   );
 
-  return res.status(201).json({ session_id, qrcode, class_id, subject_id, faculty_id, starttime, endtime, date });
+  return res.status(201).json({
+    session_id,
+    qrcode,
+    qr_image,
+    class_id,
+    subject_id,
+    faculty_id,
+    starttime,
+    endtime,
+    date,
+    allowed_radius_m
+  });
 };
 
 export const validateSession = async (req, res) => {

@@ -40,12 +40,16 @@ CREATE TABLE IF NOT EXISTS FACULTY_TO_CLASS (
 CREATE TABLE IF NOT EXISTS CLASS_SESSION (
   session_id TEXT PRIMARY KEY,
   qrcode TEXT NOT NULL,
+  qr_image TEXT,
   subject_id INTEGER,
   class_id INTEGER,
   faculty_id INTEGER,
   starttime TEXT NOT NULL,
   endtime TEXT NOT NULL,
   date TEXT NOT NULL,
+  faculty_lat REAL,
+  faculty_lng REAL,
+  allowed_radius_m INTEGER DEFAULT 100,
   FOREIGN KEY (subject_id) REFERENCES SUBJECT (sub_id),
   FOREIGN KEY (class_id) REFERENCES CLASS (class_id),
   FOREIGN KEY (faculty_id) REFERENCES FACULTY (faculty_id)
