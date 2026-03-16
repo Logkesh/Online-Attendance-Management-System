@@ -1,8 +1,8 @@
-# QR Code and Location-Based Attendance Management System
+# QR Code and Location-Based Smart Attendance Management System
 
-A complete 3-tier full-stack project:
+A complete 3-tier attendance system for a college project:
 
-- **Frontend:** React + Vite + TypeScript + Tailwind CSS
+- **Frontend:** React + Vite + TypeScript + Tailwind CSS (Android-style low-fidelity wireframe UI)
 - **Backend:** Node.js + Express + JWT + bcrypt + CORS
 - **Database:** SQLite
 
@@ -15,56 +15,20 @@ root/
 └── database/
 ```
 
-## Database Schema
+## Database
 
-Database file: `database/attendance_system.db`
+- SQLite DB file: `database/attendance_system.db`
+- SQL schema script: `database/init.sql`
+- Required tables implemented:
+  - `FACULTY`
+  - `STUDENT`
+  - `CLASS`
+  - `SUBJECT`
+  - `FACULTY_TO_CLASS`
+  - `CLASS_SESSION`
+  - `ATTENDANCE`
 
-Tables implemented:
-- `FACULTY`
-- `STUDENT`
-- `CLASS`
-- `SUBJECT`
-- `FACULTY_TO_CLASS`
-- `CLASS_SESSION`
-- `ATTENDANCE`
-
-Schema script: `database/init.sql`
-
-## Backend Structure
-
-```text
-backend/
-├── server.js
-├── config/db.js
-├── routes/
-│   ├── authRoutes.js
-│   ├── sessionRoutes.js
-│   └── attendanceRoutes.js
-├── controllers/
-│   ├── authController.js
-│   ├── sessionController.js
-│   └── attendanceController.js
-└── middleware/
-    └── authMiddleware.js
-```
-
-## Frontend Screens
-
-- SplashScreen
-- LoginScreen
-- FacultyHomeScreen
-- StudentHomeScreen
-- FacultyDashboardScreen
-- StudentDashboardScreen
-- StartAttendanceScreen
-- QRDisplayScreen
-- QRScanScreen
-- ManualAttendanceScreen
-- AttendanceStatusScreen
-
-Implemented in `frontend/src/App.tsx` with React Router routes.
-
-## API Endpoints
+## Backend API
 
 ### Auth
 - `POST /api/auth/faculty/login`
@@ -77,18 +41,34 @@ Implemented in `frontend/src/App.tsx` with React Router routes.
 
 ### Attendance
 - `POST /api/attendance/mark`
+- `GET /api/attendance/class/:class_id/students`
 - `GET /api/attendance/student/:student_id`
 
-## Sample Test Data
+## Frontend Screens (implemented)
 
-Seeded automatically at backend start:
+### Common
+- Splash Screen
+- Login Screen
 
-- Faculty:
-  - username: `faculty1`
-  - password: `faculty123`
-- Student:
-  - username: `student1`
-  - password: `student123`
+### Faculty
+- Faculty Home Screen
+- Start Attendance Screen
+- QR Code Display Screen (live generated QR-style matrix + countdown)
+- Manual Attendance Screen (student list + checkbox selection + save)
+- Faculty Dashboard (total classes, present count, subject-wise summary)
+
+### Student
+- Student Home Screen
+- QR Scan Screen (camera frame layout + session validation + attendance mark)
+- Attendance Status Screen (success/failure)
+- Student Dashboard (overall %, subject-wise cards, attendance history)
+
+## Sample Seeded Data
+
+Inserted automatically on first backend run:
+
+- Faculty: `faculty1 / faculty123`
+- Student: `student1 / student123`
 - Class: `CSE-A`
 - Subject: `Data Structures`
 
@@ -108,8 +88,6 @@ cd backend
 node server.js
 ```
 
-Backend: `http://localhost:4000`
-
 ### 3) Start frontend
 
 ```bash
@@ -117,10 +95,9 @@ cd frontend
 npm run dev
 ```
 
-Frontend: `http://localhost:5173`
+## Security and Validation
 
-## Notes
-
-- JWT middleware protects session and attendance routes.
-- Passwords are hashed using bcrypt.
-- Attendance duplicate prevention is enforced by both API checks and DB composite primary key.
+- JWT authentication middleware for protected routes
+- Password hashing using bcrypt
+- Session activity/time validation
+- Duplicate attendance prevention at API + composite PK level

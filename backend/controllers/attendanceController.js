@@ -44,8 +44,22 @@ export const markAttendance = async (req, res) => {
   return res.status(201).json({ message: 'Attendance marked successfully' });
 };
 
+export const studentsByClass = async (req, res) => {
+  const { class_id } = req.params;
+
+  const students = await dbAsync.all(
+    'SELECT student_id, stud_name, stud_username FROM STUDENT WHERE student_class_id = ? ORDER BY stud_name',
+    [class_id]
+  );
+
+  return res.json(students);
+};
+
 export const studentAttendanceHistory = async (req, res) => {
   const { student_id } = req.params;
+
+  const student = await dbAsync.get('SELECT student_class_id FROM STUDENT WHERE student_id = ?', [student_id]);
+  if (!student) return res.status(404).json({ message: 'Student not found' });
 
   const records = await dbAsync.all(
     `SELECT a.*, cs.subject_id, cs.class_id, s.sub_name, c.class_name
@@ -58,5 +72,33 @@ export const studentAttendanceHistory = async (req, res) => {
     [student_id]
   );
 
-  return res.json(records);
+  const classTotalSessions = await dbAsync.get(
+    'SELECT COUNT(*) AS total FROM CLASS_SESSION WHERE class_id = ?',
+    [student.student_class_id]
+  );
+
+  const subjectSummaryRows = await dbAsync.all(
+    `SELECT s.sub_name, cs.subject_id,
+      COUNT(DISTINCT cs.session_id) AS total_sessions,
+      COUNT(DISTINCT a.session_id) AS present_sessions
+     FROM CLASS_SESSION cs
+     LEFT JOIN SUBJECT s ON s.sub_id = cs.subject_id
+     LEFT JOIN ATTENDANCE a ON a.session_id = cs.session_id AND a.student_id = ?
+     WHERE cs.class_id = ?
+     GROUP BY cs.subject_id, s.sub_name`,
+    [student_id, student.student_class_id]
+  );
+
+  return res.json({
+    records,
+    summary: {
+      totalSessions: Number(classTotalSessions?.total || 0),
+      presentSessions: records.length,
+      overallPercentage:
+        Number(classTotalSessions?.total || 0) > 0
+          ? Number(((records.length / Number(classTotalSessions.total)) * 100).toFixed(1))
+          : 0,
+      subjects: subjectSummaryRows
+    }
+  });
 };
