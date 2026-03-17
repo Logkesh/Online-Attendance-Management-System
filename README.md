@@ -9,8 +9,8 @@
 - Faculty starts attendance session from mobile UI.
 - Faculty location is captured automatically from device geolocation.
 - Backend generates QR payload + QR image and stores session with location + allowed radius.
-- QR display screen shows generated QR image and countdown.
-- Manual attendance entry is available inside QR generation flow (from QR display screen).
+- QR display screen shows generated QR image with a fixed 5:00 to 0:00 validity countdown.
+- Manual attendance entry is available inside QR generation flow (from QR display screen) and marks selected students present for that live session.
 - Student scans with device camera (no session textbox).
 - Student location is captured automatically when scanning and validated against session range.
 - Duplicate attendance is blocked.

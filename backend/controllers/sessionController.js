@@ -10,15 +10,21 @@ const isActiveSession = (session) => {
 };
 
 export const createSession = async (req, res) => {
-  const { subject_id, class_id, faculty_id, starttime, endtime, date, faculty_lat, faculty_lng, allowed_radius_m = 100 } = req.body;
+  const { subject_id, class_id, faculty_id, faculty_lat, faculty_lng, allowed_radius_m = 100 } = req.body;
 
-  if (!subject_id || !class_id || !faculty_id || !starttime || !endtime || !date) {
-    return res.status(400).json({ message: 'All session fields are required' });
+  if (!subject_id || !class_id || !faculty_id) {
+    return res.status(400).json({ message: 'subject_id, class_id and faculty_id are required' });
   }
 
   if (faculty_lat == null || faculty_lng == null) {
     return res.status(400).json({ message: 'Faculty location is required to start session' });
   }
+
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10);
+  const starttime = now.toTimeString().slice(0, 8);
+  const endDate = new Date(now.getTime() + 5 * 60 * 1000);
+  const endtime = endDate.toTimeString().slice(0, 8);
 
   const session_id = crypto.randomUUID();
   const qrPayload = {
@@ -54,7 +60,8 @@ export const createSession = async (req, res) => {
     starttime,
     endtime,
     date,
-    allowed_radius_m
+    allowed_radius_m,
+    expires_in_seconds: 300
   });
 };
 

@@ -16,6 +16,8 @@ type SessionResponse = {
   endtime: string;
   date: string;
   allowed_radius_m: number;
+  expires_in_seconds: number;
+  created_at?: number;
 };
 
 type Student = { student_id: number; stud_name: string; stud_username: string };
@@ -168,9 +170,6 @@ const StartAttendanceScreen = () => {
   const navigate = useNavigate();
   const [classId, setClassId] = useState(1);
   const [subjectId, setSubjectId] = useState(1);
-  const [starttime, setStarttime] = useState('09:00:00');
-  const [endtime, setEndtime] = useState('09:10:00');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [radius, setRadius] = useState(100);
   const [message, setMessage] = useState('');
 
@@ -186,9 +185,6 @@ const StartAttendanceScreen = () => {
             subject_id: subjectId,
             class_id: classId,
             faculty_id: userId,
-            starttime,
-            endtime,
-            date,
             faculty_lat: location.lat,
             faculty_lng: location.lng,
             allowed_radius_m: radius
@@ -197,7 +193,8 @@ const StartAttendanceScreen = () => {
         token
       )) as SessionResponse;
 
-      localStorage.setItem('active-session', JSON.stringify(data));
+      const sessionWithMeta = { ...data, created_at: Date.now() };
+      localStorage.setItem('active-session', JSON.stringify(sessionWithMeta));
       navigate('/faculty/qr');
     } catch (err) {
       setMessage((err as Error).message);
@@ -218,11 +215,6 @@ const StartAttendanceScreen = () => {
           <option value={1}>Data Structures</option>
         </select>
       </ScreenCard>
-      <div className="grid grid-cols-2 gap-2">
-        <input className="rounded-lg border border-slate-300 px-2 py-2 text-xs" type="time" value={starttime.slice(0, 5)} onChange={(e) => setStarttime(`${e.target.value}:00`)} />
-        <input className="rounded-lg border border-slate-300 px-2 py-2 text-xs" type="time" value={endtime.slice(0, 5)} onChange={(e) => setEndtime(`${e.target.value}:00`)} />
-      </div>
-      <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
       <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" type="number" min={10} value={radius} onChange={(e) => setRadius(Number(e.target.value))} placeholder="Allowed radius (meters)" />
       <ActionButton text="Start Session" onClick={startSession} />
       {message && <p className="text-xs text-slate-600">{message}</p>}
@@ -243,10 +235,10 @@ const QRCodeDisplayScreen = () => {
 
   useEffect(() => {
     if (!session) return;
+    const startedAt = session.created_at || Date.now();
     const refresh = () => {
-      const end = new Date(`${session.date}T${session.endtime}`).getTime();
-      const now = Date.now();
-      setLiveSeconds(Math.max(0, Math.floor((end - now) / 1000)));
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      setLiveSeconds(Math.max(0, 300 - elapsed));
     };
 
     refresh();
@@ -271,7 +263,7 @@ const QRCodeDisplayScreen = () => {
       <ScreenCard>
         <img src={session.qr_image} alt="Generated attendance QR" className="mx-auto h-64 w-64 border border-slate-300 p-2" />
       </ScreenCard>
-      <p className="text-center text-sm font-medium text-slate-800">Time Left: {mins}:{secs}</p>
+      <p className="text-center text-sm font-medium text-slate-800">QR valid for: {mins}:{secs}</p>
       <ActionButton text="Manual Attendance" variant="muted" onClick={() => navigate('/faculty/manual')} />
       <ActionButton
         text="End Session"
@@ -321,14 +313,15 @@ const ManualAttendanceScreen = () => {
       return;
     }
 
-    const results = await Promise.allSettled(
-      selectedStudents.map((s) =>
-        apiRequest('/attendance/mark', { method: 'POST', body: JSON.stringify({ session_id: session.session_id, student_id: s.student_id }) }, token)
-      )
-    );
-
-    const success = results.filter((r) => r.status === 'fulfilled').length;
-    setStatus(`Saved ${success}/${selectedStudents.length} attendance entries.`);
+    try {
+      const response = await apiRequest('/attendance/manual-mark', {
+        method: 'POST',
+        body: JSON.stringify({ session_id: session.session_id, student_ids: selectedStudents.map((s) => s.student_id) })
+      }, token);
+      setStatus(`Marked ${response.marked}/${selectedStudents.length} students as present.`);
+    } catch (err) {
+      setStatus((err as Error).message);
+    }
   };
 
   return (

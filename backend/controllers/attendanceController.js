@@ -69,6 +69,52 @@ export const markAttendance = async (req, res) => {
   return res.status(201).json({ message: 'Attendance marked successfully' });
 };
 
+
+export const manualMarkAttendance = async (req, res) => {
+  const { session_id, student_ids } = req.body;
+
+  if (req.user?.role !== 'faculty') {
+    return res.status(403).json({ message: 'Only faculty can use manual attendance' });
+  }
+
+  if (!session_id || !Array.isArray(student_ids) || student_ids.length === 0) {
+    return res.status(400).json({ message: 'session_id and non-empty student_ids are required' });
+  }
+
+  const session = await dbAsync.get('SELECT * FROM CLASS_SESSION WHERE session_id = ?', [session_id]);
+  if (!session) return res.status(404).json({ message: 'Session not found' });
+
+  if (!isActiveSession(session)) return res.status(400).json({ message: 'Session is not active' });
+
+  const now = new Date();
+  let marked = 0;
+  const skipped = [];
+
+  for (const studentId of student_ids) {
+    const student = await dbAsync.get('SELECT * FROM STUDENT WHERE student_id = ?', [studentId]);
+    if (!student || student.student_class_id !== session.class_id) {
+      skipped.push({ student_id: studentId, reason: 'Invalid student/class' });
+      continue;
+    }
+
+    const existing = await dbAsync.get('SELECT * FROM ATTENDANCE WHERE session_id = ? AND student_id = ?', [session_id, studentId]);
+    if (existing) {
+      skipped.push({ student_id: studentId, reason: 'Already marked' });
+      continue;
+    }
+
+    await dbAsync.run('INSERT INTO ATTENDANCE (session_id, student_id, time, date) VALUES (?, ?, ?, ?)', [
+      session_id,
+      studentId,
+      now.toTimeString().slice(0, 8),
+      now.toISOString().slice(0, 10)
+    ]);
+    marked += 1;
+  }
+
+  return res.status(201).json({ message: 'Manual attendance processed', marked, skipped });
+};
+
 export const studentsByClass = async (req, res) => {
   const { class_id } = req.params;
   const students = await dbAsync.all(
