@@ -37,3 +37,26 @@ Seeded users:
 cd backend && npm install && node server.js
 cd frontend && npm install && npm run dev
 ```
+
+
+## Wi-Fi / Mobile device access (Vite `--host`)
+
+If you open the frontend from another device on the same Wi-Fi network:
+
+1. Start backend bound to all interfaces (default now):
+```bash
+cd backend
+node server.js
+```
+Backend logs both localhost and LAN URL (`http://<your-lan-ip>:4000`).
+
+2. Start frontend with host mode:
+```bash
+cd frontend
+npm run dev -- --host
+```
+
+3. Open `http://<your-lan-ip>:5173` on the mobile device.
+
+The frontend now auto-targets `http://<current-hostname>:4000/api` on non-localhost hosts.
+You can still override manually with `VITE_API_URL`.
