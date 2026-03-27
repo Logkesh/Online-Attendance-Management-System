@@ -1,66 +1,45 @@
 import { createContext, useContext, useMemo, useState } from 'react';
-import { apiFetch } from '../api/client';
-import type { Role, User } from '../types';
 
-interface AuthContextType {
-  token: string | null;
-  user: User | null;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, role: Role) => Promise<void>;
-  logout: () => void;
-}
+type Role = 'faculty' | 'student' | null;
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+type AuthState = {
+  token: string;
+  userId: number;
+  role: Role;
+  name: string;
+};
 
-const TOKEN_KEY = 'attendance-token';
-const USER_KEY = 'attendance-user';
+const defaultState: AuthState = { token: '', userId: 0, role: null, name: '' };
+
+const AuthContext = createContext({
+  ...defaultState,
+  login: (_token: string, _userId: number, _role: Role, _name: string) => {},
+  logout: () => {}
+});
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
-  const [user, setUser] = useState<User | null>(() => {
-    const raw = localStorage.getItem(USER_KEY);
-    return raw ? (JSON.parse(raw) as User) : null;
+  const [state, setState] = useState<AuthState>(() => {
+    const raw = localStorage.getItem('attendance-auth');
+    return raw ? JSON.parse(raw) : defaultState;
   });
 
-  const save = (nextToken: string, nextUser: User) => {
-    setToken(nextToken);
-    setUser(nextUser);
-    localStorage.setItem(TOKEN_KEY, nextToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
-  };
-
-  const login = async (email: string, password: string) => {
-    const data = await apiFetch<{ token: string; user: User }>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password })
-    });
-    save(data.token, data.user);
-  };
-
-  const register = async (name: string, email: string, password: string, role: Role) => {
-    const data = await apiFetch<{ token: string; user: User }>('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ name, email, password, role })
-    });
-    save(data.token, data.user);
-  };
-
-  const logout = () => {
-    setToken(null);
-    setUser(null);
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-  };
-
-  const value = useMemo(() => ({ token, user, login, register, logout }), [token, user]);
+  const value = useMemo(
+    () => ({
+      ...state,
+      login: (token: string, userId: number, role: Role, name: string) => {
+        const next = { token, userId, role, name };
+        localStorage.setItem('attendance-auth', JSON.stringify(next));
+        setState(next);
+      },
+      logout: () => {
+        localStorage.removeItem('attendance-auth');
+        setState(defaultState);
+      }
+    }),
+    [state]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used inside AuthProvider');
-  }
-  return context;
-};
+export const useAuth = () => useContext(AuthContext);

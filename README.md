@@ -1,119 +1,62 @@
-# QR Code + Location-Based Attendance Management System
+# QR Code and Location-Based Smart Attendance Management System
 
-Full-stack attendance platform inspired by the provided QR attendance GitHub project and rebuilt with a mobile-first frontend matching the provided Figma login/dashboard style.
+## Stack
+- Frontend: React + Vite + TypeScript + Tailwind
+- Backend: Node.js + Express + JWT + bcrypt + qrcode
+- Database: SQLite (`database/attendance_system.db`)
 
-## Tech Stack
+## Key implemented behavior
+- Faculty starts attendance session from mobile UI.
+- Faculty location is captured automatically from device geolocation.
+- Backend generates QR payload + QR image and stores session with location + allowed radius.
+- QR display screen shows generated QR image with a fixed 5:00 to 0:00 validity countdown.
+- Manual attendance entry is available inside QR generation flow (from QR display screen) and marks selected students present for that live session.
+- Student scans with device camera (no session textbox).
+- Student location is captured automatically when scanning and validated against session range.
+- Duplicate attendance is blocked.
 
-### Frontend
-- React.js
-- Vite
-- TypeScript
-- Tailwind CSS
+## Backend routes
+- `POST /api/auth/faculty/login`
+- `POST /api/auth/student/login`
+- `POST /api/session/create`
+- `POST /api/session/validate`
+- `GET /api/session/faculty/:faculty_id`
+- `POST /api/attendance/mark`
+- `GET /api/attendance/class/:class_id/students`
+- `GET /api/attendance/student/:student_id`
 
-### Backend
-- Node.js
-- Express.js
-- JWT authentication
-- bcrypt password hashing
-- QR code generation (`qrcode`)
+## DB initialization / seeding
+DB is auto-initialized and seeded **before server starts listening** via `initializeDatabase()` in `backend/server.js`.
 
-### Database
-- SQLite
+Seeded users:
+- Faculty: `faculty1 / faculty123`
+- Student: `student1 / student123`
 
-## Features
-
-- User registration/login (`teacher` and `student` roles)
-- JWT-protected APIs
-- Teacher:
-  - Create courses
-  - Start attendance sessions with:
-    - QR token
-    - Class location (lat/lon)
-    - Allowed attendance radius
-    - Expiration timestamp
-  - View generated QR image for live attendance
-- Student:
-  - Enroll in course by `courseId`
-  - Submit attendance with:
-    - scanned QR token
-    - current latitude/longitude
-- Attendance validation rules:
-  - Valid QR session token
-  - Session not expired
-  - Student enrolled in course
-  - Student within allowed geofence radius
-  - One attendance record per student per session
-
-## Project Structure
-
-```text
-.
-├── backend
-│   ├── src
-│   │   ├── auth.js
-│   │   ├── db.js
-│   │   ├── server.js
-│   │   └── utils.js
-│   └── package.json
-└── frontend
-    ├── src
-    │   ├── api
-    │   ├── components
-    │   ├── context
-    │   ├── pages
-    │   └── types
-    └── package.json
-```
-
-## Setup
-
-### 1) Install dependencies
-
+## Run
 ```bash
-cd backend && npm install
-cd ../frontend && npm install
+cd backend && npm install && node server.js
+cd frontend && npm install && npm run dev
 ```
 
-### 2) Configure backend env
 
+## Wi-Fi / Mobile device access (Vite `--host`)
+
+If you open the frontend from another device on the same Wi-Fi network:
+
+1. Start backend bound to all interfaces (default now):
 ```bash
 cd backend
-cp .env.example .env
-# edit JWT_SECRET if needed
+node server.js
 ```
+Backend logs both localhost and LAN URL (`http://<your-lan-ip>:4000`).
 
-### 3) Run backend
-
-```bash
-cd backend
-npm run dev
-```
-
-Backend runs at `http://localhost:4000`.
-
-### 4) Run frontend
-
+2. Start frontend with host mode:
 ```bash
 cd frontend
-npm run dev
+npm run dev -- --host
 ```
 
-Frontend runs at `http://localhost:5173` and calls backend at `http://localhost:4000/api` (login route: `/login`).
+3. Open `http://<your-lan-ip>:5173` on the mobile device.
 
-To override API URL in frontend, set `VITE_API_URL`.
-
-## Key API Endpoints
-
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `GET /api/courses`
-- `POST /api/courses`
-- `POST /api/courses/:courseId/enroll`
-- `POST /api/sessions`
-- `POST /api/attendance/scan`
-- `GET /api/sessions/:sessionId/attendance`
-
-## Notes
-
-- For QR scanning in production mobile apps, integrate a scanner library and pass the extracted `qrToken` into the attendance API.
-- This implementation currently provides a token input field in the student dashboard for quick testing.
+The frontend now auto-targets `http://<current-hostname>:4000/api` on non-localhost hosts.
+You can still override manually with `VITE_API_URL`.
