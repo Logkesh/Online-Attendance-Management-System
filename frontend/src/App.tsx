@@ -39,11 +39,11 @@ const MobileScreen = ({ title, children }: { title: string; children: React.Reac
   const location = useLocation();
 
   return (
-    <div className="min-h-screen bg-slate-200 px-4 py-5">
-      <div className="mx-auto w-full max-w-sm overflow-hidden rounded-3xl border border-slate-300 bg-white shadow-lg">
-        <header className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
-          <h1 className="text-sm font-semibold text-slate-800">{title}</h1>
-          <span className="text-[10px] text-slate-500">{location.pathname}</span>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-sky-50 to-fuchsia-100 px-4 py-6">
+      <div className="mx-auto w-full max-w-sm overflow-hidden rounded-[2rem] border border-white/50 bg-white/80 shadow-2xl backdrop-blur">
+        <header className="flex items-center justify-between border-b border-slate-200/70 bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-3 text-white">
+          <h1 className="text-sm font-semibold tracking-wide">{title}</h1>
+          <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px]">{location.pathname}</span>
         </header>
         <main className="space-y-4 p-4">{children}</main>
       </div>
@@ -52,15 +52,15 @@ const MobileScreen = ({ title, children }: { title: string; children: React.Reac
 };
 
 const ActionButton = ({ text, onClick, variant = 'default' }: { text: string; onClick: () => void; variant?: 'default' | 'danger' | 'muted' }) => {
-  const style = variant === 'danger' ? 'bg-rose-600 text-white' : variant === 'muted' ? 'bg-slate-200 text-slate-800' : 'bg-slate-800 text-white';
+  const style = variant === 'danger' ? 'bg-gradient-to-r from-rose-500 to-red-600 text-white shadow-md' : variant === 'muted' ? 'bg-slate-100 text-slate-800 border border-slate-200' : 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md';
   return (
-    <button className={`w-full rounded-lg px-4 py-2 text-sm font-medium ${style}`} onClick={onClick}>
+    <button className={`w-full rounded-xl px-4 py-2.5 text-sm font-semibold transition hover:scale-[1.01] ${style}`} onClick={onClick}>
       {text}
     </button>
   );
 };
 
-const ScreenCard = ({ children }: { children: React.ReactNode }) => <div className="rounded-xl border border-slate-200 bg-white p-3">{children}</div>;
+const ScreenCard = ({ children }: { children: React.ReactNode }) => <div className="rounded-2xl border border-indigo-100 bg-white/90 p-3 shadow-sm">{children}</div>;
 
 const getCurrentLocation = async () =>
   new Promise<{ lat: number; lng: number }>((resolve, reject) => {
@@ -87,8 +87,8 @@ const SplashScreen = () => {
   return (
     <MobileScreen title="Splash Screen">
       <div className="flex h-[70vh] flex-col items-center justify-center gap-4">
-        <div className="grid h-20 w-20 place-items-center rounded-2xl border-2 border-slate-700 text-2xl">QR</div>
-        <p className="text-center text-sm font-semibold text-slate-800">QR Code and Location-Based Smart Attendance</p>
+        <div className="grid h-20 w-20 place-items-center rounded-3xl bg-white shadow-lg ring-4 ring-indigo-200 text-2xl text-indigo-700">QR</div>
+        <p className="text-center text-sm font-bold text-indigo-900">QR Code and Location-Based Smart Attendance</p>
         <div className="h-2 w-28 overflow-hidden rounded-full bg-slate-200">
           <div className="h-full w-2/3 animate-pulse bg-slate-600" />
         </div>
@@ -123,14 +123,14 @@ const LoginScreen = () => {
   return (
     <MobileScreen title="Login Screen">
       <form onSubmit={submit} className="space-y-3">
-        <select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={role} onChange={(e) => setRole(e.target.value as Role)}>
+        <select className="w-full rounded-xl border border-indigo-200 bg-white/90 px-3 py-2 text-sm" value={role} onChange={(e) => setRole(e.target.value as Role)}>
           <option value="faculty">Faculty</option>
           <option value="student">Student</option>
         </select>
-        <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Email / ID" value={username} onChange={(e) => setUsername(e.target.value)} />
-        <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <input className="w-full rounded-xl border border-indigo-200 bg-white/90 px-3 py-2 text-sm" placeholder="Email / ID" value={username} onChange={(e) => setUsername(e.target.value)} />
+        <input className="w-full rounded-xl border border-indigo-200 bg-white/90 px-3 py-2 text-sm" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
         {error && <p className="text-xs text-rose-600">{error}</p>}
-        <button className="w-full rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white" type="submit">Login</button>
+        <button className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-2.5 text-sm font-semibold text-white shadow-md" type="submit">Login</button>
       </form>
       <p className="text-[11px] text-slate-500">Demo: faculty1/faculty123 and student1/student123</p>
     </MobileScreen>
@@ -205,17 +205,17 @@ const StartAttendanceScreen = () => {
     <MobileScreen title="Start Attendance Screen">
       <ScreenCard>
         <label className="mb-1 block text-xs text-slate-500">Select Class</label>
-        <select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={classId} onChange={(e) => setClassId(Number(e.target.value))}>
+        <select className="w-full rounded-xl border border-indigo-200 bg-white/90 px-3 py-2 text-sm" value={classId} onChange={(e) => setClassId(Number(e.target.value))}>
           <option value={1}>CSE-A</option>
         </select>
       </ScreenCard>
       <ScreenCard>
         <label className="mb-1 block text-xs text-slate-500">Select Subject</label>
-        <select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={subjectId} onChange={(e) => setSubjectId(Number(e.target.value))}>
+        <select className="w-full rounded-xl border border-indigo-200 bg-white/90 px-3 py-2 text-sm" value={subjectId} onChange={(e) => setSubjectId(Number(e.target.value))}>
           <option value={1}>Data Structures</option>
         </select>
       </ScreenCard>
-      <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" type="number" min={10} value={radius} onChange={(e) => setRadius(Number(e.target.value))} placeholder="Allowed radius (meters)" />
+      <input className="w-full rounded-xl border border-indigo-200 bg-white/90 px-3 py-2 text-sm" type="number" min={10} value={radius} onChange={(e) => setRadius(Number(e.target.value))} placeholder="Allowed radius (meters)" />
       <ActionButton text="Start Session" onClick={startSession} />
       {message && <p className="text-xs text-slate-600">{message}</p>}
     </MobileScreen>
